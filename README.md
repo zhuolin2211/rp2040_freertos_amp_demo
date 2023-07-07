@@ -1,0 +1,2 @@
+# rp2040_freertos_amp_demo
+移植freerrtos到RP2040平台，支持SMP
