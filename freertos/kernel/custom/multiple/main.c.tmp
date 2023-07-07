@@ -1,0 +1,161 @@
+/* Kernel includes. */
+#include "FreeRTOS.h" /* Must come first. */
+#include "task.h"     /* RTOS task related API prototypes. */
+#include "queue.h"    /* RTOS queue related API prototypes. */
+#include "timers.h"   /* Software timer related API prototypes. */
+#include "semphr.h"   /* Semaphore related API prototypes. */
+#include <stdio.h>
+#include "pico/stdlib.h"
+#include "pico/multicore.h"
+
+
+
+
+/*-----------------------------------------------------------*/
+
+#include "pico/mutex.h"
+#include "pico/sem.h"
+
+#if configNUM_CORES > 1
+#error Require only one core configured for FreeRTOS
+#endif
+
+auto_init_mutex(xSDKMutex);
+static semaphore_t xSDKSemaphore;
+
+static void prvNonRTOSWorker() {
+    printf("Core %d: Doing regular SDK stuff\n", get_core_num());
+    uint32_t counter;
+    while (true) {
+        mutex_enter_blocking(&xSDKMutex);
+        printf("Core %d: Acquire SDK mutex\n", get_core_num());
+        absolute_time_t end_time = make_timeout_time_ms(750);
+        while (!time_reached(end_time)) {
+            counter++;
+            printf("Core %d: Busy work with mutex %d\n", get_core_num(), counter);
+            busy_wait_us(137384);
+        }
+        printf("Core %d: Release SDK mutex\n", get_core_num());
+        mutex_exit(&xSDKMutex);
+        printf("Core %d: Starting SDK sleep\n", get_core_num());
+        sleep_ms(1200);
+        printf("Core %d: Finish SDK sleep; release SDK semaphore\n", get_core_num());
+        sem_release(&xSDKSemaphore);
+    }
+}
+
+static void prvLaunchRTOS() {
+    printf("Core %d: Launching FreeRTOS scheduler\n", get_core_num());
+    /* Start the tasks and timer running. */
+    vTaskStartScheduler();
+    /* should never reach here */
+    panic_unsupported();
+}
+
+static void prvCore1Entry() {
+#if ( mainRUN_FREE_RTOS_ON_CORE == 1 )
+    prvLaunchRTOS();
+#else
+    prvNonRTOSWorker();
+#endif
+}
+
+int main(void) {
+    TimerHandle_t xExampleSoftwareTimer = NULL;
+
+    /* Configure the system ready to run the demo.  The clock configuration
+    can be done here if it was not done before main() was called. */
+    prvSetupHardware();
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    /* Create the task that uses SDK mutexes */
+    xTaskCreate(prvSDKMutexUseTask,
+                "SDK Mutex Use",
+                configMINIMAL_STACK_SIZE,
+                NULL,
+                mainSDK_MUTEX_USE_TASK_PRIORITY,
+                NULL);
+
+    sem_init(&xSDKSemaphore, 0, 1);
+
+    /* Create the task that uses SDK mutexes */
+    xTaskCreate(prvSDKSemaphoreUseTask,
+                "SDK Seamphore Use",
+                configMINIMAL_STACK_SIZE,
+                NULL,
+                mainSDK_SEMAPHORE_USE_TASK_PRIORITY,
+                NULL);
+
+    /* Create the software timer as described in the comments at the top of
+    this file. */
+    xExampleSoftwareTimer = xTimerCreate(     /* A text name, purely to help
+                                            debugging. */
+            (const char *) "LEDTimer",
+            /* The timer period, in this case
+            1000ms (1s). */
+            mainSOFTWARE_TIMER_PERIOD_MS,
+            /* This is a periodic timer, so
+            xAutoReload is set to pdTRUE. */
+            pdTRUE,
+            /* The ID is not used, so can be set
+            to anything. */
+            (void *) 0,
+            /* The callback function that switches
+            the LED off. */
+            vExampleTimerCallback
+    );
+
+    /* Start the created timer.  A block time of zero is used as the timer
+    command queue cannot possibly be full here (this is the first timer to
+    be created, and it is not yet running). */
+    xTimerStart(xExampleSoftwareTimer, 0);
+
+    multicore_launch_core1(prvCore1Entry);
+#if ( mainRUN_FREE_RTOS_ON_CORE == 0 )
+    prvLaunchRTOS();
+#else
+    prvNonRTOSWorker();
+#endif
+}
+/*-----------------------------------------------------------*/
+
+/*-----------------------------------------------------------*/
+
+/*-----------------------------------------------------------*/
+
+
+/*-----------------------------------------------------------*/
+
+
+/*-----------------------------------------------------------*/
+
+/*-----------------------------------------------------------*/
+
+
+/*-----------------------------------------------------------*/
+
+
+/*-----------------------------------------------------------*/
+
+static void prvSetupHardware( void )
+{
+    /* Want to be able to printf */
+    stdio_init_all();
+    /* And flash LED */
+    gpio_init(PICO_DEFAULT_LED_PIN);
+    gpio_set_dir(PICO_DEFAULT_LED_PIN, GPIO_OUT);
+}

@@ -1,0 +1,15 @@
+file(GLOB common_file *.c *.h ./portable/MemMang/heap_4.c)
+file(GLOB sigle_core ./custom/*.c ./custom/*.h ./portable./GCC./ARM_CM0/*.c ./portable./GCC./ARM_CM0/*.h)
+file(GLOB multi_core ./custom/multiple/*.c /custom/multiple/*.h ./portable./GCC/ARM_CM0_Multiple/*.c ./portable/GCC./ARM_CM0_Multiple/*.h)
+#file(GLOB_RECURSE ALL_SOURCE  "*.c" "*.h")
+
+include_directories(include)
+#include_directories(portable/GCC/ARM_CM0)
+add_library(freertos_sigle_core_lib ${common_file} ${sigle_core})
+target_include_directories(freertos_sigle_core_lib PRIVATE custom)
+target_include_directories(freertos_sigle_core_lib PRIVATE portable/GCC/ARM_CM0)
+
+add_library(freertos_multi_core_lib ${common_file} ${multi_core})
+target_include_directories(freertos_multi_core_lib PRIVATE custom/multiple)
+target_include_directories(freertos_multi_core_lib PRIVATE portable/GCC/ARM_CM0_Multiple)
+target_link_libraries(freertos_multi_core_lib pico_stdlib pico_multicore hardware_exception)
